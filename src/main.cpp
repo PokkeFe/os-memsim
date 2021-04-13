@@ -74,8 +74,13 @@ void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table
 {
     // TODO: implement this!
     //   - create new process in the MMU
+    int pid = mmu->createProcess();
     //   - allocate new variables for the <TEXT>, <GLOBALS>, and <STACK>
+    allocateVariable(pid, "<TEXT>", Char, text_size, mmu, page_table);
+    allocateVariable(pid, "<GLOBALS>", Char, data_size, mmu, page_table);
+    allocateVariable(pid, "<STACK>", Char, 65536, mmu, page_table);
     //   - print pid
+    printf("%d\n", pid);
 }
 
 void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table)
