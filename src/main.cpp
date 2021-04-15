@@ -72,7 +72,6 @@ void printStartMessage(int page_size)
 
 void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table)
 {
-    // TODO: implement this!
     //   - create new process in the MMU
     int pid = mmu->createProcess();
     //   - allocate new variables for the <TEXT>, <GLOBALS>, and <STACK>
