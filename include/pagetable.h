@@ -36,6 +36,12 @@ public:
     void addEntry(uint32_t pid, int page_number);
     int getPhysicalAddress(uint32_t pid, uint32_t virtual_address);
     void print();
+
+    // CUSTOM
+    std::vector<std::string> getAllPagesForPID(int pid);
+    int getPageSize();
+    int getOffsetSize();
+    bool entryExists(int pid, int page);
 };
 
 #endif // __PAGETABLE_H_

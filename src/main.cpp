@@ -11,6 +11,9 @@ void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *valu
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table);
 void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table);
 
+// CUSTOM
+int getDataTypeSize(DataType type);
+
 int main(int argc, char **argv)
 {
     // Ensure user specified page size as a command line parameter
@@ -39,6 +42,15 @@ int main(int argc, char **argv)
     while (command != "exit") {
         // Handle command
         // TODO: implement this!
+        if(command == "create") {
+            createProcess(1024, 1024, mmu, page_table);
+        }
+        if(command == "print page") {
+            page_table->print();
+        }
+        if(command == "print mmu") {
+            mmu->print();
+        }
 
         // Get next command
         std::cout << "> ";
@@ -84,7 +96,44 @@ void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table
 
 void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table)
 {
-    // TODO: implement this!
+    //first search the page table to see if there is a location your variable will fit w/o allocating a new page.
+    int size = getDataTypeSize(type);
+    uint32_t virtual_addr = -1;
+    std::vector<std::string> process_pages = page_table->getAllPagesForPID(pid);
+    for(std::vector<std::string>::iterator iter = process_pages.begin(); iter != process_pages.end() && virtual_addr == -1; ++iter) {
+        // for each page table entry for process, check mmu for free space in that page
+        int page = std::stoi(iter->substr(iter->find("|") + 1));
+        virtual_addr = mmu->getFreeSpaceInPage(pid, page, size, page_table->getPageSize(), num_elements);
+        // if a free space is found, we don't have to make new page in the page table
+    }
+    //2 bytes left on page but trying to allocate 4 byte integer -> DO NOt SPLit an individual item accros pages. need to have contiguous memory addresses
+    //in mmu loop through adn find the free space variables. 
+
+    if(virtual_addr == -1) {
+        // a free spot in an existing page was not found, we need to run the process again for all free spaces, and get the page number to add entry
+        virtual_addr = mmu->getFreeSpaceAnywhere(pid, size, page_table->getPageSize(), num_elements);
+        // if -1 returned, there is no free memory anywhere
+        // allocate new page based off new virtual address
+        if(virtual_addr == -1) {
+            exit(-5);
+        }
+    }
+    
+    int page = virtual_addr >> page_table->getOffsetSize();
+    int end_page = virtual_addr + (size * num_elements) >> page_table->getOffsetSize();
+    for(int i = page; i <= end_page; i++) {
+        if(!page_table->entryExists(pid, i)) {
+            page_table->addEntry(pid, i);
+        }
+    }
+
+    mmu->addVariableToProcess(pid, var_name, type, size * num_elements, virtual_addr);
+    mmu->updateFreeSpace(pid, virtual_addr, size * num_elements);
+
+    // TODO: Update this
+    printf("Variable %10s added to Process %5d with size %8d at virtual addr %8d.\n", var_name.c_str(), pid, size * num_elements, virtual_addr);
+
+    //to know what page to pass in to the page table.addentry -> add methods to page table
     //   - find first free space within a page already allocated to this process that is large enough to fit the new variable
     //   - if no hole is large enough, allocate new page(s)
     //   - insert variable into MMU
@@ -112,4 +161,25 @@ void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table)
     // TODO: implement this!
     //   - remove process from MMU
     //   - free all pages associated with given process
+}
+
+// CUSTOM
+
+int getDataTypeSize(DataType type) {
+    int size = 0; // in bytes
+    switch(type) {
+        case Char:
+            size = 1;
+            break;
+        case Short:
+            size = 2;
+            break;
+        case Int:
+        case Float:
+            size = 4;
+        case Long:
+        case Double:
+            size = 8;
+    }
+    return size;
 }

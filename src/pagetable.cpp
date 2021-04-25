@@ -78,8 +78,55 @@ void PageTable::print()
 
     std::vector<std::string> keys = sortedKeys();
 
+    std::string s, pid, page_n;
+    int delim_pos, frame_n;
+
     for (i = 0; i < keys.size(); i++)
     {
-        // TODO: print all pages
+        // get pid and page number from string
+        s = keys[i];
+        delim_pos = s.find("|");
+        pid = s.substr(0, delim_pos);
+        page_n = s.substr(delim_pos + 1, s.length() - 1);
+        frame_n = _table[keys[i]];
+        printf("%6s|%13s|%14d\n", pid.c_str(), page_n.c_str(), frame_n);
     }
+}
+
+// CUSTOM METHODS
+
+std::vector<std::string> PageTable::getAllPagesForPID(int pid) 
+{
+    std::vector<std::string> keys = sortedKeys();
+    std::vector<std::string> entries;
+    std::string s;
+    int i, entry_pid;
+
+    for (i = 0; i < keys.size(); i++)
+    {
+        s = keys[i];
+        entry_pid = stoi(s.substr(0, s.find("|")));
+        if(entry_pid == pid)
+        {
+            entries.push_back(keys[i]);
+        }
+    }
+
+    return entries;
+}
+
+int PageTable::getPageSize() {
+    return _page_size;
+}
+
+int PageTable::getOffsetSize() {
+    return (int)log2((double)_page_size);
+}
+
+bool PageTable::entryExists(int pid, int page) {
+    std::string entry = std::to_string(pid) + "|" + std::to_string(page);
+    if(_table.count(entry) > 0) {
+        return true;
+    }
+    return false;
 }
