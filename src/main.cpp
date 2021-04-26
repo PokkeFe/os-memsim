@@ -147,6 +147,35 @@ void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *valu
     //   - insert `value` into `memory` at physical address
     //   * note: this function only handles a single element (i.e. you'll need to call this within a loop when setting
     //           multiple elements of an array)
+    Process* p = mmu->getProcessByPID(pid);
+    uint32_t virtual_address = -1;
+    uint8_t type = -1;
+    for(int vi = 0; vi < p->variables.size(); vi++) {
+        Variable* v = p->variables[vi];
+        if(var_name == v->name) {
+            virtual_address = v->virtual_address;
+            type = v->type;
+        }
+    }
+    uint32_t physical_address = page_table->getPhysicalAddress(pid, virtual_address + offset);
+    // cast based on type
+    switch(type) {
+        case Char:
+            ((char*)memory)[virtual_address] = *(char*)value; // 1 byte
+            break;
+        case Short:
+            ((short*)memory)[virtual_address] = *(short*)value; // 2 bytes
+            break;
+        case Int:
+        case Float:
+            ((int*)memory)[virtual_address] = *(int*)value; // 4 bytes
+            break;
+        case Long:
+        case Double:
+            ((long*)memory)[virtual_address] = *(long*)value; // 8 bytes
+            break;
+    }
+    
 }
 
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table)
