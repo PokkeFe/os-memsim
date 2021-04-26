@@ -33,7 +33,7 @@ public:
     void addVariableToProcess(uint32_t pid, std::string var_name, DataType type, uint32_t size, uint32_t address);
     void print();
 
-    // CUSTOM
+    // CUSTOM FUNCTIONS
     Process* getProcessByPID(int pid);
     std::vector<Variable*> getFreeSpaceVector(int pid);
     uint32_t getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements);

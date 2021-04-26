@@ -63,12 +63,16 @@ void Mmu::print()
         {
             // TODO: print all variables (excluding <FREE_SPACE> entries)
             Variable* v = _processes[i]->variables[j];
-            printf("%6d|%15s|%14X|%12d\n", _processes[i]->pid, v->name.c_str(), v->virtual_address, v->size);
+            printf(" %4d | %-14s|   0x%08X |%11d\n", _processes[i]->pid, v->name.c_str(), v->virtual_address, v->size);
         }
     }
 }
 
-// CUSTOM
+
+
+// ---------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
+// ---------------------------------------------------------------------------------------------------------------- //
 
 Process* Mmu::getProcessByPID(int pid) {
     int i;

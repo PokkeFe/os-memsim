@@ -11,8 +11,11 @@ void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *valu
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table);
 void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table);
 
-// CUSTOM
+// CUSTOM FUNCTIONS
 int getDataTypeSize(DataType type);
+void printCommand(std::string object, Mmu *mmu, PageTable *page_table);
+DataType stringToDataType(std::string input);
+void splitString(std::string text, char d, std::vector<std::string>& result);
 
 int main(int argc, char **argv)
 {
@@ -36,20 +39,29 @@ int main(int argc, char **argv)
     PageTable *page_table = new PageTable(page_size);
 
     // Prompt loop
+    std::vector<std::string> command_list;
     std::string command;
     std::cout << "> ";
     std::getline (std::cin, command);
     while (command != "exit") {
-        // Handle command
-        // TODO: implement this!
-        if(command == "create") {
-            createProcess(1024, 1024, mmu, page_table);
-        }
-        if(command == "print page") {
-            page_table->print();
-        }
-        if(command == "print mmu") {
-            mmu->print();
+        //Split full command line into command and arguments and store in command_list
+        splitString(command, ' ', command_list);
+
+        //<---------------------------------------------------Currently will break unless all the arguments are formatted correctly
+        if(command_list[0] == "create") {
+            createProcess(std::stoi(command_list[1]), std::stoi(command_list[2]), mmu, page_table);
+        } else if(command_list[0] == "allocate") {
+            allocateVariable(std::stoul(command_list[1]), command_list[2], stringToDataType(command_list[3]), std::stoul(command_list[4]), mmu, page_table);
+        } else if(command_list[0] == "set") {
+            // TODO: Implement set
+        } else if(command_list[0] == "free") {
+            freeVariable(std::stoul(command_list[1]), command_list[2], mmu, page_table);
+        } else if(command_list[0] == "terminate") {
+            terminateProcess(std::stoul(command_list[1]), mmu, page_table);
+        } else if(command_list[0] == "print") {
+            printCommand(command_list[1], mmu, page_table);
+        } else {
+            std::cout << "error: command not recognized" << std:: endl;
         }
 
         // Get next command
@@ -57,7 +69,7 @@ int main(int argc, char **argv)
         std::getline (std::cin, command);
     }
 
-    // Cean up
+    // Clean up
     free(memory);
     delete mmu;
     delete page_table;
@@ -163,8 +175,31 @@ void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table)
     //   - free all pages associated with given process
 }
 
-// CUSTOM
 
+
+// ---------------------------------------------------------------------------------------------------------------- //
+// ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
+// ---------------------------------------------------------------------------------------------------------------- //
+
+void printCommand(std::string object, Mmu *mmu, PageTable *page_table) {
+    if(object == "mmu") {
+        mmu->print();
+    } else if(object == "page") {
+        page_table->print();
+    } else if(object == "processes") {
+        //TODO: Print the PIDs of all running processes
+    } else {
+        size_t delim_pos = object.find(":");
+        uint32_t pid = std::stoul(object.substr(0, delim_pos));
+        std::string var_name = object.substr(delim_pos+1);
+        //TODO: Print the value of the given variable for the given process PID
+    }
+
+}
+
+/** Converts a DataType to an integer equal to its corresponding size.
+ *  @return Returns the corresponding size for the given DataType. Will return 0 if given FreeSpace.
+ */
 int getDataTypeSize(DataType type) {
     int size = 0; // in bytes
     switch(type) {
@@ -182,4 +217,87 @@ int getDataTypeSize(DataType type) {
             size = 8;
     }
     return size;
+}
+
+/** Converts a string to one of the DataType enumerators defined in mmu.cpp based on its string equivalent.
+ *  @return Returns the associated DataType enum or FreeSpace if no DataType can be associated.
+ */
+DataType stringToDataType(std::string input) {
+    if(input == "char") {
+        return DataType::Char;
+    } else if(input == "short") {
+        return DataType::Short;
+    } else if(input == "int") {
+        return DataType::Int;
+    } else if(input == "float") {
+        return DataType::Float;
+    } else if(input == "long") {
+        return DataType::Long;
+    } else if(input == "double") {
+        return DataType::Double;
+    } else {
+        //If freespace is returned, that means the string was unrecognized
+        return DataType::FreeSpace; 
+    }
+}
+
+/* [splitSting() from Assignment 2 - osshell]
+   text: string to split
+   d: character delimiter to split `text` on
+   result: vector of strings - result will be stored here
+*/
+void splitString(std::string text, char d, std::vector<std::string>& result)
+{
+    enum states { NONE, IN_WORD, IN_STRING } state = NONE;
+
+    int i;
+    std::string token;
+    result.clear();
+    for (i = 0; i < text.length(); i++)
+    {
+        char c = text[i];
+        switch (state) {
+            case NONE:
+                if (c != d)
+                {
+                    if (c == '\"')
+                    {
+                        state = IN_STRING;
+                        token = "";
+                    }
+                    else
+                    {
+                        state = IN_WORD;
+                        token = c;
+                    }
+                }
+                break;
+            case IN_WORD:
+                if (c == d)
+                {
+                    result.push_back(token);
+                    state = NONE;
+                }
+                else
+                {
+                    token += c;
+                }
+                break;
+            case IN_STRING:
+                if (c == '\"')
+                {
+                    result.push_back(token);
+                    state = NONE;
+                }
+                else
+                {
+                    token += c;
+                }
+                break;
+        }
+    }
+    if (state != NONE)
+    {
+        result.push_back(token);
+    }
 }
