@@ -99,7 +99,7 @@ void PageTable::print()
 // ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
 // ---------------------------------------------------------------------------------------------------------------- //
 
-std::vector<std::string> PageTable::getAllPagesForPID(int pid) 
+std::vector<std::string> PageTable::getAllPagesForPID(uint32_t pid) 
 {
     std::vector<std::string> keys = sortedKeys();
     std::vector<std::string> entries;
@@ -127,10 +127,17 @@ int PageTable::getOffsetSize() {
     return (int)log2((double)_page_size);
 }
 
-bool PageTable::entryExists(int pid, int page) {
+bool PageTable::entryExists(uint32_t pid, int page) {
     std::string entry = std::to_string(pid) + "|" + std::to_string(page);
     if(_table.count(entry) > 0) {
         return true;
     }
     return false;
+}
+
+void PageTable::removeEntry(uint32_t pid, int page_number) {
+    std::string entry = std::to_string(pid) + "|" + std::to_string(page_number);
+    if(_table.count(entry) > 0) {
+        _table.erase(entry);
+    }
 }

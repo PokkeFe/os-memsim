@@ -39,6 +39,8 @@ public:
     uint32_t getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements);
     uint32_t getFreeSpaceAnywhere(int pid, int size, int page_size, int num_elements);
     void updateFreeSpace(int pid, int virtual_address, int size);
+    bool removeVariable(int pid, std::string var_name);
+    std::vector<int> getExclusivePages(int pid, std::string var_name, int page_size);
 };
 
 #endif // __MMU_H_

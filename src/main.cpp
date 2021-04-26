@@ -108,93 +108,93 @@ void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table
 
 void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table)
 {
-    //first search the page table to see if there is a location your variable will fit w/o allocating a new page.
+    // Initialize Data
     int size = getDataTypeSize(type);
     uint32_t virtual_addr = -1;
+
+    // Search the page table to see if there is a location your variable will fit w/o allocating a new page.
     std::vector<std::string> process_pages = page_table->getAllPagesForPID(pid);
-    for(std::vector<std::string>::iterator iter = process_pages.begin(); iter != process_pages.end() && virtual_addr == -1; ++iter) {
-        // for each page table entry for process, check mmu for free space in that page
+    for(std::vector<std::string>::iterator iter = process_pages.begin(); iter != process_pages.end() && virtual_addr == -1; ++iter)
+    {
+        // For each page table entry for process, check mmu for free space in that page
         int page = std::stoi(iter->substr(iter->find("|") + 1));
         virtual_addr = mmu->getFreeSpaceInPage(pid, page, size, page_table->getPageSize(), num_elements);
-        // if a free space is found, we don't have to make new page in the page table
     }
-    //2 bytes left on page but trying to allocate 4 byte integer -> DO NOt SPLit an individual item accros pages. need to have contiguous memory addresses
-    //in mmu loop through adn find the free space variables. 
 
-    if(virtual_addr == -1) {
-        // a free spot in an existing page was not found, we need to run the process again for all free spaces, and get the page number to add entry
+    // Free space in existing page not found.
+    if(virtual_addr == -1) 
+    {
+        // Run the process again for all free spaces, and get the page number to add entry
         virtual_addr = mmu->getFreeSpaceAnywhere(pid, size, page_table->getPageSize(), num_elements);
-        // if -1 returned, there is no free memory anywhere
-        // allocate new page based off new virtual address
-        if(virtual_addr == -1) {
-            exit(-5);
+        //! if -1 returned, there is no free memory anywhere
+        if(virtual_addr == -1)
+        {
+            printf("error: allocation exceeds system memory.\n");
+            return;
         }
     }
     
+    // Load page if memory area falls outside of loaded pages.
     int page = virtual_addr >> page_table->getOffsetSize();
     int end_page = virtual_addr + (size * num_elements) >> page_table->getOffsetSize();
-    for(int i = page; i <= end_page; i++) {
-        if(!page_table->entryExists(pid, i)) {
+    for(int i = page; i <= end_page; i++)
+    {
+        if(!page_table->entryExists(pid, i))
+        {
             page_table->addEntry(pid, i);
         }
     }
 
+    // Insert Variable into MMU and update Free Space
     mmu->addVariableToProcess(pid, var_name, type, size * num_elements, virtual_addr);
     mmu->updateFreeSpace(pid, virtual_addr, size * num_elements);
 
-    // TODO: Update this
+    // Print Virtual Memory Address
+    // TODO: Update this to match output standard
     printf("Variable %10s added to Process %5d with size %8d at virtual addr %8d.\n", var_name.c_str(), pid, size * num_elements, virtual_addr);
-
-    //to know what page to pass in to the page table.addentry -> add methods to page table
-    //   - find first free space within a page already allocated to this process that is large enough to fit the new variable
-    //   - if no hole is large enough, allocate new page(s)
-    //   - insert variable into MMU
-    //   - print virtual memory address
 }
 
 void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *value, Mmu *mmu, PageTable *page_table, void *memory)
 {
-    // TODO: implement this!
-    //   - look up physical address for variable based on its virtual address / offset
-    //   - insert `value` into `memory` at physical address
     //   * note: this function only handles a single element (i.e. you'll need to call this within a loop when setting
-    //           multiple elements of an array)
+
+    // Get process and initialize variable data
     Process* p = mmu->getProcessByPID(pid);
     uint32_t virtual_address = -1;
-    uint8_t type = -1;
-    for(int vi = 0; vi < p->variables.size(); vi++) {
+    DataType type;
+
+    // Get variable information from process
+    for(int vi = 0; vi < p->variables.size(); vi++)
+    {
         Variable* v = p->variables[vi];
-        if(var_name == v->name) {
+        if(var_name == v->name)
+        {
             virtual_address = v->virtual_address;
             type = v->type;
         }
     }
-    uint32_t physical_address = page_table->getPhysicalAddress(pid, virtual_address + offset);
-    // cast based on type
-    switch(type) {
-        case Char:
-            ((char*)memory)[virtual_address] = *(char*)value; // 1 byte
-            break;
-        case Short:
-            ((short*)memory)[virtual_address] = *(short*)value; // 2 bytes
-            break;
-        case Int:
-        case Float:
-            ((int*)memory)[virtual_address] = *(int*)value; // 4 bytes
-            break;
-        case Long:
-        case Double:
-            ((long*)memory)[virtual_address] = *(long*)value; // 8 bytes
-            break;
-    }
-    
+
+    // Get physical address from page table
+    uint32_t physical_address = page_table->getPhysicalAddress(pid, virtual_address + (offset * getDataTypeSize(type)));
+
+    // Copy value into memory with an offset of the physical address
+    // ! I am afraid
+    memcpy((void*)((char*)memory + physical_address), value, getDataTypeSize(type));
+    memcpy(value, (void*)((char*)memory + physical_address), getDataTypeSize(type));
 }
 
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table)
 {
-    // TODO: implement this!
-    //   - remove entry from MMU
-    //   - free page if this variable was the only one on a given page
+    // Get vector of pages exclusively containing var_name
+    std::vector<int> exclusive_pages = mmu->getExclusivePages(pid, var_name, page_table->getPageSize());
+
+    // Remove entry from MMU
+    mmu->removeVariable(pid, var_name);
+
+    // Loop through the vector of exclusive pages and remove them from the page table
+    for(int i = 0; i < exclusive_pages.size(); i++) {
+        page_table->removeEntry(pid, exclusive_pages[i]);
+    }
 }
 
 void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table)
@@ -231,7 +231,8 @@ void printCommand(std::string object, Mmu *mmu, PageTable *page_table) {
  */
 int getDataTypeSize(DataType type) {
     int size = 0; // in bytes
-    switch(type) {
+    switch(type)
+    {
         case Char:
             size = 1;
             break;

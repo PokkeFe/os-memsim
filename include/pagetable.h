@@ -38,10 +38,11 @@ public:
     void print();
 
     // CUSTOM
-    std::vector<std::string> getAllPagesForPID(int pid);
+    std::vector<std::string> getAllPagesForPID(uint32_t pid);
     int getPageSize();
     int getOffsetSize();
-    bool entryExists(int pid, int page);
+    bool entryExists(uint32_t pid, int page);
+    void removeEntry(uint32_t pid, int page_number);
 };
 
 #endif // __PAGETABLE_H_
