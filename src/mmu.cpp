@@ -135,7 +135,7 @@ uint32_t Mmu::getFreeSpaceInPage(int pid, int page, int size, int page_size, int
                 }
             }
         }
-        addr += 1;
+        addr += size;
     }
     return -1;
 }
@@ -156,8 +156,11 @@ uint32_t Mmu::getFreeSpaceAnywhere(int pid, int size, int page_size, int num_ele
         if(v->type != FreeSpace) {
             continue;
         } else {
+            // GENERALIZE ( if the element crosses page boundaries )
             // if the free space address can fit the var and free space addr + size does not overflow page boundaries, return the free space address 
-            if(v->size >= size && (v->virtual_address % page_size) + size <= page_size) {
+            int space_left_in_page = page_size - (v->virtual_address % page_size);
+            int byte_overrun = (space_left_in_page % size);
+            if(v->size >= size && byte_overrun == 0 ) {
                 // can fit variable at start of free space
                 // if multiple, can it fit the whole array?
                 if(num_elements > 1) {
@@ -170,7 +173,7 @@ uint32_t Mmu::getFreeSpaceAnywhere(int pid, int size, int page_size, int num_ele
                 
             } else {
                 // can't fit variable at start of free space, try to fit at start of next page
-                int next_page_addr = v->virtual_address + (page_size - (v->virtual_address % page_size));
+                int next_page_addr = v->virtual_address + byte_overrun;
                 if(next_page_addr + size <= v->virtual_address + v->size) {
                     // if multiple, can it fit the whole array?
                     if(num_elements > 1) {

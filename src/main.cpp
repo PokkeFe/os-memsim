@@ -179,8 +179,8 @@ void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *valu
 
     // Copy value into memory with an offset of the physical address
     // ! I am afraid
-    memcpy((void*)((char*)memory + physical_address), value, getDataTypeSize(type));
-    memcpy(value, (void*)((char*)memory + physical_address), getDataTypeSize(type));
+    memcpy(((char*)memory + physical_address), value, getDataTypeSize(type));
+    memcpy(value, ((char*)memory + physical_address), getDataTypeSize(type));
 }
 
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table)
