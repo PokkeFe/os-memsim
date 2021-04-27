@@ -106,6 +106,14 @@ std::vector<Variable*> Mmu::getFreeSpaceVector(int pid) {
     return freeSpaceVariables;
 }
 
+/** Searches page for free space to allocate variable to
+ * @param pid PID of process to search.
+ * @param page Page to search within.
+ * @param size Type size of the variable.
+ * @param page_size Total size of the page.
+ * @param num_elements Number of elements to accomodate.
+ * @return Virtual memory address where space is found within the page. -1 if no space found in the page.
+ */
 uint32_t Mmu::getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements) {
     Process* p = getProcessByPID(pid);
     // starting at base addr of page
@@ -132,6 +140,13 @@ uint32_t Mmu::getFreeSpaceInPage(int pid, int page, int size, int page_size, int
     return -1;
 }
 
+/** Gets free space anywhere in the pid's virtual memory
+ * @param pid PID of the process to search.
+ * @param size Size of first element in bytes.
+ * @param page_size Size of one page.
+ * @param num_elements Total number of elements in the block
+ * @return Returns the location in virtual memory where space is found. -1 if no space is found.
+ */
 uint32_t Mmu::getFreeSpaceAnywhere(int pid, int size, int page_size, int num_elements) {
     Process* p = getProcessByPID(pid);
     
@@ -172,6 +187,11 @@ uint32_t Mmu::getFreeSpaceAnywhere(int pid, int size, int page_size, int num_ele
     return -1;
 }
 
+/** Updates free space to accomodate newly allocated variables.
+ * @param pid PID of the process allocating to.
+ * @param virtual_address Virtual address where the new variable is being allocated
+ * @param size Size of the variable being allocated
+ */
 void Mmu::updateFreeSpace(int pid, int virtual_address, int size) {
     Process* p = getProcessByPID(pid);
     for(int vi = 0; vi < p->variables.size(); vi++) {
@@ -199,6 +219,11 @@ void Mmu::updateFreeSpace(int pid, int virtual_address, int size) {
 
 }
 
+/** Removes a varaible from a process and modifies free space to accomodate.
+ * @param pid PID of the process to remove from.
+ * @param var_name Name of the variable to remove.
+ * @return True if the variable is successfully removed. False otherwise.
+ */
 bool Mmu::removeVariable(int pid, std::string var_name)
 {
     // Check all variables for var_name
@@ -287,7 +312,12 @@ bool Mmu::removeVariable(int pid, std::string var_name)
     return true;
 }
 
-
+/** Gets a list of pages exclusive to the variable with name var_name
+ * @param pid PID of the process to check.
+ * @param var_name Name of the variable to get pages from.
+ * @param page_size Size of each page
+ * @return A vector of pages exclusive to the provided variable.
+ */
 std::vector<int> Mmu::getExclusivePages(int pid, std::string var_name, int page_size)
 {
     Process* p = getProcessByPID(pid);
@@ -323,7 +353,8 @@ std::vector<int> Mmu::getExclusivePages(int pid, std::string var_name, int page_
                 // Get the page range for this variable
                 int vi_root_page = p->variables[vi]->virtual_address >> offset_length;
                 int vi_end_page = (p->variables[vi]->virtual_address + p->variables[vi]->size) >> offset_length;
-                for(int page_i = vi_root_page; page_i <= vi_end_page; page_i++) {
+                for(int page_i = vi_root_page; page_i <= vi_end_page; page_i++)
+                {
                     if(page_i >= root_page && page_i <= end_page) {
                         // Remove the element from the page if it exists
                         exclusive_pages.erase(std::remove(exclusive_pages.begin(), exclusive_pages.end(), page_i), exclusive_pages.end());
@@ -335,4 +366,35 @@ std::vector<int> Mmu::getExclusivePages(int pid, std::string var_name, int page_
     }
     
     return exclusive_pages;
+}
+
+/** Checks if the variable exists within the process.
+ * @param pid pid of the process to check.
+ * @param var_name name of the variable to check.
+ * @return Returns true if the variable exists in the process.
+ */
+bool Mmu::variableExists(int pid, std::string var_name)
+{
+    Process* p = getProcessByPID(pid);
+    for(int i = 0; i < p->variables.size(); i++)
+    {
+        if(p->variables[i]->name == var_name)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+/** Removes process with pid from the processes vector
+ * @param pid PID of the process to remove.
+ */
+void Mmu::removeProcess(int pid) {
+    for(int i = 0; i < _processes.size(); i++)
+    {
+        if(_processes[i]->pid == pid) {
+            _processes.erase(_processes.begin() + i);
+            return;
+        }
+    }
 }

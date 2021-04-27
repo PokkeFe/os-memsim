@@ -41,8 +41,9 @@ public:
     std::vector<std::string> getAllPagesForPID(uint32_t pid);
     int getPageSize();
     int getOffsetSize();
-    bool entryExists(uint32_t pid, int page);
+    bool entryExists(uint32_t pid, int page_number);
     void removeEntry(uint32_t pid, int page_number);
+    void removeEntry(std::string entry);
 };
 
 #endif // __PAGETABLE_H_

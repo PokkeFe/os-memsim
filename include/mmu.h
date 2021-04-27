@@ -41,6 +41,8 @@ public:
     void updateFreeSpace(int pid, int virtual_address, int size);
     bool removeVariable(int pid, std::string var_name);
     std::vector<int> getExclusivePages(int pid, std::string var_name, int page_size);
+    bool variableExists(int pid, std::string var_name);
+    void removeProcess(int pid);
 };
 
 #endif // __MMU_H_

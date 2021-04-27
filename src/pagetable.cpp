@@ -99,6 +99,10 @@ void PageTable::print()
 // ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
 // ---------------------------------------------------------------------------------------------------------------- //
 
+/** Gets all the pages for a given PID
+ * @param pid ID of process.
+ * @return Vector of all the entries associated with the provided process.
+ */
 std::vector<std::string> PageTable::getAllPagesForPID(uint32_t pid) 
 {
     std::vector<std::string> keys = sortedKeys();
@@ -119,24 +123,48 @@ std::vector<std::string> PageTable::getAllPagesForPID(uint32_t pid)
     return entries;
 }
 
+/** Gets the size of the page
+ * @return The size of a page
+ */
 int PageTable::getPageSize() {
     return _page_size;
 }
 
+/** Gets the number of bytes to offset for retrieving page value.
+ * @return Size of offset in bytes.
+ */
 int PageTable::getOffsetSize() {
     return (int)log2((double)_page_size);
 }
 
-bool PageTable::entryExists(uint32_t pid, int page) {
-    std::string entry = std::to_string(pid) + "|" + std::to_string(page);
+/** Checks the table to see if the page exists for the given PID
+ * @param pid ID of the process to check.
+ * @param page_number Page to check.
+ * @return True if the page exists for that process. False otherwise.
+ */
+bool PageTable::entryExists(uint32_t pid, int page_number) {
+    std::string entry = std::to_string(pid) + "|" + std::to_string(page_number);
     if(_table.count(entry) > 0) {
         return true;
     }
     return false;
 }
 
+/** Removes an entry from the page table
+ * @param pid ID of process to remove entry from
+ * @param page_number Page number to remove.
+ */
 void PageTable::removeEntry(uint32_t pid, int page_number) {
     std::string entry = std::to_string(pid) + "|" + std::to_string(page_number);
+    if(_table.count(entry) > 0) {
+        _table.erase(entry);
+    }
+}
+
+/** Removes an entry from the page table
+ * @param entry Entry key to try to remove from the table
+ */
+void PageTable::removeEntry(std::string entry) {
     if(_table.count(entry) > 0) {
         _table.erase(entry);
     }
