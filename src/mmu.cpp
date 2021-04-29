@@ -76,7 +76,28 @@ void Mmu::print()
 // ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
 // ---------------------------------------------------------------------------------------------------------------- //
 
-/** Gets a pointer to a process by the pid
+/** Gets a variable by its name within a given process.
+ * @param name The name of the variable to search for.
+ * @param process The process to search for the variable name in.
+ * @return A pointer to the variable with the given name in the given process. Or returns NULL is it does not exist.
+ */
+Variable* Mmu::getVariableByProcessAndName(Process* process, std::string name) {
+    for(int i=0; i<process->variables.size(); i++) {
+        if(process->variables[i]->name == name) {
+            return process->variables[i];
+        }
+    }
+    return NULL;
+}
+
+/** Gets the whole list of processes from the MMU.
+ * @return The list of processes.
+ */
+std::vector<Process*> Mmu::getProcessesVector() {
+    return _processes;
+}
+
+/** Gets a pointer to a process by the pid.
  * @param pid The Process ID of the process to retrieve.
  * @return A pointer to the process, or NULL if no process with that PID is found.
  */

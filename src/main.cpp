@@ -13,7 +13,7 @@ void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table);
 
 // CUSTOM FUNCTIONS
 int getDataTypeSize(DataType type);
-void printCommand(std::string object, Mmu *mmu, PageTable *page_table);
+void printCommand(std::string object, Mmu *mmu, PageTable *page_table, void *memory);
 DataType stringToDataType(std::string input);
 void splitString(std::string text, char d, std::vector<std::string>& result);
 
@@ -53,13 +53,57 @@ int main(int argc, char **argv)
         } else if(command_list[0] == "allocate") {
             allocateVariable(std::stoul(command_list[1]), command_list[2], stringToDataType(command_list[3]), std::stoul(command_list[4]), mmu, page_table);
         } else if(command_list[0] == "set") {
-            // TODO: Implement set
+
+            // TODO: TEST AND FINISH THIS 
+            //      * (This looks gross, but I don't want to make it prettier until I can troubleshoot it, out of fear that 
+            //         I might break more things about it in the process)
+            uint32_t pid = std::stoul(command_list[1]);
+            std::string var_name = command_list[2];
+            Process* process = mmu->getProcessByPID(pid);
+            uint32_t offset = std::stoul(command_list[3]);
+            if(process != NULL) {
+                Variable* variable = mmu->getVariableByProcessAndName(process, var_name);
+                if(variable != NULL) {
+                    uint32_t var_type_size = getDataTypeSize(variable->type);
+                    void* value = malloc(var_type_size*8);
+                    for(int i=0; i<command_list.size()-4; i++) {
+                        unsigned long int user_value = atoi(command_list[i].c_str());
+                        //int user_value = atoi(command_list[i].c_str());
+                        int user_int = (int)user_value;
+                        memcpy(value, &user_int, var_type_size);
+                        /*
+                            switch(var_type_size)
+                            {
+                                case 1:
+                                    memcpy(value, (char*)user_value, var_type_size);
+                                    break;
+                                case 2:
+                                    memcpy(value, (short*)user_value, var_type_size);
+                                    break;
+                                case 4:
+                                    memcpy(value, (int*)user_value, var_type_size);
+                                    break;
+                                case 8:
+                                    memcpy(value, (long*)user_value, var_type_size);
+                                    break;
+                            }
+                        */
+                        setVariable(pid, var_name, offset+i, value, mmu, page_table, memory);
+                    }
+                    free(value);
+                } else {
+                    printf("error: variable not found");
+                }
+            } else {
+                printf("error: process not found"); 
+            }
+            
         } else if(command_list[0] == "free") {
             freeVariable(std::stoul(command_list[1]), command_list[2], mmu, page_table);
         } else if(command_list[0] == "terminate") {
             terminateProcess(std::stoul(command_list[1]), mmu, page_table);
         } else if(command_list[0] == "print") {
-            printCommand(command_list[1], mmu, page_table);
+            printCommand(command_list[1], mmu, page_table, memory);
         } else {
             std::cout << "error: command not recognized" << std:: endl;
         }
@@ -156,7 +200,7 @@ void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_
 
 void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *value, Mmu *mmu, PageTable *page_table, void *memory)
 {
-    //   * note: this function only handles a single element (i.e. you'll need to call this within a loop when setting
+    //   * note: this function only handles a single element (i.e. you'll need to call this within a loop when setting multiple elements of an array)
 
     // Get process and initialize variable data
     Process* p = mmu->getProcessByPID(pid);
@@ -178,9 +222,7 @@ void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *valu
     uint32_t physical_address = page_table->getPhysicalAddress(pid, virtual_address + (offset * getDataTypeSize(type)));
 
     // Copy value into memory with an offset of the physical address
-    // ! I am afraid
     memcpy(((char*)memory + physical_address), value, getDataTypeSize(type));
-    memcpy(value, ((char*)memory + physical_address), getDataTypeSize(type));
 }
 
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table)
@@ -217,23 +259,46 @@ void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table)
 // ------------------------------------------------CUSTOM FUNCTIONS------------------------------------------------ //
 // ---------------------------------------------------------------------------------------------------------------- //
 
-void printCommand(std::string object, Mmu *mmu, PageTable *page_table) {
+/** Handles the print command if entered by the user.
+ *  @param object The object to print. Either "mmu", "page", "processes", or "[PID]:[variable Name]"
+ *  @param mmu Pointer to the mmu to print.
+ *  @param page_table Pointer to the page table to print.
+ *  @param memory Pointer to the memory to print the value of the given variable
+ */
+void printCommand(std::string object, Mmu *mmu, PageTable *page_table, void *memory) {
     if(object == "mmu") {
         mmu->print();
     } else if(object == "page") {
         page_table->print();
     } else if(object == "processes") {
-        //TODO: Print the PIDs of all running processes
+        // Prints the PIDs of all running processes
+        std::vector<Process*> processes = mmu->getProcessesVector();
+        for(int i=0; i<processes.size(); i++) {
+            std::cout << processes[i]->pid << std::endl;
+        }
     } else {
         size_t delim_pos = object.find(":");
         uint32_t pid = std::stoul(object.substr(0, delim_pos));
         std::string var_name = object.substr(delim_pos+1);
-        //TODO: Print the value of the given variable for the given process PID
+
+        // TODO: TEST AND FINISH THIS
+        Variable* variable = mmu->getVariableByProcessAndName(mmu->getProcessByPID(pid), var_name);
+        uint32_t var_type_size = getDataTypeSize(variable->type);
+        uint32_t num_of_elements = variable->size/var_type_size;    // This should always divide evenly
+        uint32_t physical_address = page_table->getPhysicalAddress( pid, variable->virtual_address + var_type_size);
+        void* value = malloc(var_type_size*8);
+        for(int i=0; i<num_of_elements && i<4; i++) {
+            physical_address += i*var_type_size;
+            memcpy(value, ((char*)memory + physical_address), var_type_size);
+            std::cout << value << std::endl; //<-------------------------------------------IDK how it would know how to print this so this probably won't work
+        }
+        free(value);
     }
 
 }
 
 /** Converts a DataType to an integer equal to its corresponding size.
+ *  @param type The given DataType to get the size of.
  *  @return Returns the corresponding size for the given DataType. Will return 0 if given FreeSpace.
  */
 int getDataTypeSize(DataType type) {
@@ -249,14 +314,17 @@ int getDataTypeSize(DataType type) {
         case Int:
         case Float:
             size = 4;
+            break;
         case Long:
         case Double:
             size = 8;
+            break;
     }
     return size;
 }
 
 /** Converts a string to one of the DataType enumerators defined in mmu.cpp based on its string equivalent.
+ *  @param input The user input string that is meant to be a DataType represented with text.
  *  @return Returns the associated DataType enum or FreeSpace if no DataType can be associated.
  */
 DataType stringToDataType(std::string input) {

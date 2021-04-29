@@ -34,6 +34,8 @@ public:
     void print();
 
     // CUSTOM FUNCTIONS
+    Variable* getVariableByProcessAndName(Process* process, std::string name);
+    std::vector<Process*> getProcessesVector();
     Process* getProcessByPID(int pid);
     std::vector<Variable*> getFreeSpaceVector(int pid);
     uint32_t getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements);
