@@ -292,6 +292,9 @@ void printCommand(std::string object, Mmu *mmu, PageTable *page_table, void *mem
                     case DataType::Short:
                         printf("%d", *(short*)value);
                         break;
+                    case DataType::Long:
+                        printf("%ld", *(long*)value);
+                        break;
                     case DataType::Int:
                         printf("%d", *(int*)value);
                         break;
