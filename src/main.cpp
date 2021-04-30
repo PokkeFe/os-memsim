@@ -64,31 +64,63 @@ int main(int argc, char **argv)
             if(process != NULL) {
                 Variable* variable = mmu->getVariableByProcessAndName(process, var_name);
                 if(variable != NULL) {
+                    
                     uint32_t var_type_size = getDataTypeSize(variable->type);
-                    void* value = malloc(var_type_size*8);
-                    for(int i=0; i<command_list.size()-4; i++) {
-                        unsigned long int user_value = atoi(command_list[i].c_str());
+                    DataType var_type = variable->type;
+                    void* value = malloc(var_type_size);
+
+                    for(int i=4; i<command_list.size(); i++) {
+                        //unsigned long int user_value = atoi(command_list[i].c_str());
                         //int user_value = atoi(command_list[i].c_str());
-                        int user_int = (int)user_value;
-                        memcpy(value, &user_int, var_type_size);
-                        /*
-                            switch(var_type_size)
-                            {
-                                case 1:
-                                    memcpy(value, (char*)user_value, var_type_size);
-                                    break;
-                                case 2:
-                                    memcpy(value, (short*)user_value, var_type_size);
-                                    break;
-                                case 4:
-                                    memcpy(value, (int*)user_value, var_type_size);
-                                    break;
-                                case 8:
-                                    memcpy(value, (long*)user_value, var_type_size);
-                                    break;
-                            }
-                        */
-                        setVariable(pid, var_name, offset+i, value, mmu, page_table, memory);
+                        //int user_int = (int)user_value;
+                        //memcpy(value, &user_int, var_type_size);
+                        //setVariable(pid, var_name, offset+i, value, mmu, page_table, memory);
+
+                        int local_offset = i - 4;
+                        // if offset goes beyond variable limits, break out of for loop
+                        if(offset + local_offset >= (variable->size/var_type_size)) break;
+
+                        switch(var_type) {
+
+                            case DataType::Char: 
+                                setVariable(pid, var_name, offset + local_offset, (void*)&command_list[i].c_str()[0], mmu, page_table, memory);
+                                break;
+
+                            case DataType::Int: 
+                                {
+                                    int value = std::stoi(command_list[i]);
+                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                                }
+                                break;
+
+                            case DataType::Long:
+                                {
+                                    long value = std::stol(command_list[i]);
+                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                                }
+                                break;
+
+                            case DataType::Short:
+                                {
+                                    short value = (short)std::stoi(command_list[i]);
+                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                                }
+                                break;
+                                
+                            case DataType::Float:
+                                {
+                                    float value = std::stof(command_list[i]);
+                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                                }
+                                break;
+
+                            case DataType::Double:
+                                {
+                                    double value = std::stod(command_list[i]);
+                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                                }
+                                break;
+                        }
                     }
                     free(value);
                 } else {
