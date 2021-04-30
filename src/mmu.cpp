@@ -136,29 +136,76 @@ std::vector<Variable*> Mmu::getFreeSpaceVector(int pid) {
  * @param num_elements Number of elements to accomodate.
  * @return Virtual memory address where space is found within the page. -1 if no space found in the page.
  */
-uint32_t Mmu::getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements) {
-    Process* p = getProcessByPID(pid);
-    // starting at base addr of page
-    // for each addr until addr - size + 1
-    // - check each free space variable
-    // - if addr -> addr + size can fit in free space variable, we have a match (freeSpace addr <= addr AND freeSpace addr + freeSpace size >= addr + size)
-    // - return addr
-    // if no match found, return -1
-    int addr = page * page_size;
-    while((addr % page_size) < page_size - size + 1) {
-        for(int vi = 0; vi < p->variables.size(); vi++) {
-            Variable* v = p->variables[vi];
-            if(v->type != FreeSpace) {
-                continue;
-            } else {
-                if(v->virtual_address <= addr && (v->virtual_address + v->size) >= (addr + (size * num_elements))) {
-                    // if here, addr is contained by free space
-                    return addr;
+uint32_t Mmu::getFreeSpaceInPage(int pid, int page, int size, int page_size, int num_elements)
+{
+    std::vector<Variable*> free_spaces = getFreeSpaceVector(pid);
+    std::vector<Variable*> free_spaces_in_page;
+
+    int offset_size = (int)log2((double)page_size);
+    int array_size = size * num_elements;
+    int space_left_in_page;
+
+    for(int i = 0; i < free_spaces.size(); i++)
+    {
+        // if the free space is in the page
+        if(free_spaces[i]->virtual_address >> offset_size == page) {
+            free_spaces_in_page.push_back(free_spaces[i]);
+        }
+    }
+
+    // For each free space, check for a full fit
+    for(int i = 0; i < free_spaces_in_page.size(); i++)
+    {
+        Variable* free_space = free_spaces_in_page[i];
+        space_left_in_page = page_size - (free_space->virtual_address % page_size);
+
+        if(array_size <= space_left_in_page)
+        {
+            // the whole array fits in the page, return the address
+            return free_space->virtual_address;
+        }
+    }
+
+    int byte_overrun;
+
+    // For each free space, check for a partial fit
+    for(int i = 0; i < free_spaces_in_page.size(); i++)
+    {
+        Variable* free_space = free_spaces_in_page[i];
+        space_left_in_page = page_size - (free_space->virtual_address % page_size);
+        byte_overrun = (space_left_in_page % size);
+
+        // check that the first element fits 
+        if(size <= space_left_in_page && size <= free_space->size) {
+                // If is array and crosses page borders
+                if(num_elements > 1 && array_size > space_left_in_page)
+                {
+                    // If an element exists overrunning the boundary
+                    if(byte_overrun != 0)
+                    {
+                        // If the array still fits in the free space
+                        if(size <= free_space->size - byte_overrun)
+                        {
+                            // return the new address
+                            return free_space->virtual_address + byte_overrun;
+                            // if not, move on to the next free space
+                        }
+                    } else {
+                        // No bytes overrun and still fits, return address
+                        return free_space->virtual_address;
+                    }
+                } else {
+                    return free_space->virtual_address;
                 }
             }
-        }
-        addr += size;
+            // Else, if the first element fits at the beginning of the next page.
+            else if(size <= free_space->size - space_left_in_page)
+            {
+                return free_space->virtual_address;
+            }
     }
+
+    // If here, no good spot found.
     return -1;
 }
 
@@ -178,34 +225,38 @@ uint32_t Mmu::getFreeSpaceAnywhere(int pid, int size, int page_size, int num_ele
         if(v->type != FreeSpace) {
             continue;
         } else {
-            // GENERALIZE ( if the element crosses page boundaries )
             // if the free space address can fit the var and free space addr + size does not overflow page boundaries, return the free space address 
+            int array_size = size * num_elements;
             int space_left_in_page = page_size - (v->virtual_address % page_size);
             int byte_overrun = (space_left_in_page % size);
-            if(v->size >= size && byte_overrun == 0 ) {
-                // can fit variable at start of free space
-                // if multiple, can it fit the whole array?
-                if(num_elements > 1) {
-                    if(v->size >= size * num_elements) {
+
+            // If first element fits inside free space ON PAGE
+            if(size <= space_left_in_page && size <= v->size) {
+                // If is array and crosses page borders
+                if(num_elements > 1 && array_size > space_left_in_page)
+                {
+                    // If an element exists overrunning the boundary
+                    if(byte_overrun != 0)
+                    {
+                        // If the array still fits in the free space
+                        if(size <= v->size - byte_overrun)
+                        {
+                            // return the new address
+                            return v->virtual_address + byte_overrun;
+                            // if not, move on to the next free space
+                        }
+                    } else {
+                        // No bytes overrun and still fits, return address
                         return v->virtual_address;
                     }
                 } else {
                     return v->virtual_address;
                 }
-                
-            } else {
-                // can't fit variable at start of free space, try to fit at start of next page
-                int next_page_addr = v->virtual_address + byte_overrun;
-                if(next_page_addr + size <= v->virtual_address + v->size) {
-                    // if multiple, can it fit the whole array?
-                    if(num_elements > 1) {
-                        if(next_page_addr + (size * num_elements) <= v->virtual_address + v->size) {
-                            return next_page_addr;
-                        }
-                    } else {
-                        return next_page_addr;
-                    }
-                }
+            }
+            // Else, if the first element fits at the beginning of the next page.
+            else if(size <= v->size - space_left_in_page)
+            {
+                return v->virtual_address;
             }
         }
     }

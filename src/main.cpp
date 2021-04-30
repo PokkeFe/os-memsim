@@ -180,7 +180,6 @@ int allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t
     mmu->updateFreeSpace(pid, virtual_addr, size * num_elements);
 
     // Print Virtual Memory Address
-    //printf("Variable %10s added to Process %5d with size %8d at virtual addr %8d.\n", var_name.c_str(), pid, size * num_elements, virtual_addr);
     return virtual_addr;
 }
 
