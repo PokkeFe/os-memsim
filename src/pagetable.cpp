@@ -32,7 +32,6 @@ void PageTable::addEntry(uint32_t pid, int page_number)
 
     int frame = 0; 
     // Find free frame
-    // TODO: TEST!
     // check each frame, if frame is already assigned, increment frame and try again
     std::map<std::string,int>::iterator it = _table.begin();
     while(it != _table.end()) {
@@ -49,7 +48,6 @@ void PageTable::addEntry(uint32_t pid, int page_number)
 int PageTable::getPhysicalAddress(uint32_t pid, uint32_t virtual_address)
 {
     // Convert virtual address to page_number and page_offset
-    // TODO: TEST
     int offset_size = (int)log2((double)_page_size);
     int page_number = (virtual_address >> offset_size);
     int page_offset = ((0xFFFFFFFF >> offset_size) & virtual_address);
@@ -62,7 +60,6 @@ int PageTable::getPhysicalAddress(uint32_t pid, uint32_t virtual_address)
     int address = -1;
     if (_table.count(entry) > 0)
     {
-        // TODO: TEST
         address = (_table[entry] * _page_size) + page_offset;
     }
 

@@ -6,14 +6,15 @@
 
 void printStartMessage(int page_size);
 void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table);
-void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table);
+int allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table);
 void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *value, Mmu *mmu, PageTable *page_table, void *memory);
 void freeVariable(uint32_t pid, std::string var_name, Mmu *mmu, PageTable *page_table);
 void terminateProcess(uint32_t pid, Mmu *mmu, PageTable *page_table);
 
 // CUSTOM FUNCTIONS
-int getDataTypeSize(DataType type);
 void printCommand(std::string object, Mmu *mmu, PageTable *page_table, void *memory);
+void launchSetVariable(uint32_t pid, std::string var_name, uint32_t offset, Mmu *mmu, PageTable *page_table, void *memory, Variable* variable, std::vector<std::string> command_list);
+int getDataTypeSize(DataType type);
 DataType stringToDataType(std::string input);
 void splitString(std::string text, char d, std::vector<std::string>& result);
 
@@ -40,109 +41,62 @@ int main(int argc, char **argv)
 
     // Prompt loop
     std::vector<std::string> command_list;
-    std::string command;
+    std::string user_input;
     std::cout << "> ";
-    std::getline (std::cin, command);
-    while (command != "exit") {
+    std::getline (std::cin, user_input);
+    while (user_input != "exit") {
         //Split full command line into command and arguments and store in command_list
-        splitString(command, ' ', command_list);
+        splitString(user_input, ' ', command_list);
+        std::string command = command_list[0];
 
-        //<---------------------------------------------------Currently will break unless all the arguments are formatted correctly
-        if(command_list[0] == "create") {
+        if(command == "create") {
             createProcess(std::stoi(command_list[1]), std::stoi(command_list[2]), mmu, page_table);
-        } else if(command_list[0] == "allocate") {
-            allocateVariable(std::stoul(command_list[1]), command_list[2], stringToDataType(command_list[3]), std::stoul(command_list[4]), mmu, page_table);
-        } else if(command_list[0] == "set") {
-
-            // TODO: TEST AND FINISH THIS 
-            //      * (This looks gross, but I don't want to make it prettier until I can troubleshoot it, out of fear that 
-            //         I might break more things about it in the process)
+        } else if(command == "allocate" || command == "set" || command == "free") {
             uint32_t pid = std::stoul(command_list[1]);
             std::string var_name = command_list[2];
             Process* process = mmu->getProcessByPID(pid);
-            uint32_t offset = std::stoul(command_list[3]);
+
+            // If the command is allocate, set, or free then try to find the PID and variable. Then print the proper error 
+            // based on if these are found or not. Otherwise, run the function.
             if(process != NULL) {
                 Variable* variable = mmu->getVariableByProcessAndName(process, var_name);
                 if(variable != NULL) {
-                    
-                    uint32_t var_type_size = getDataTypeSize(variable->type);
-                    DataType var_type = variable->type;
-                    void* value = malloc(var_type_size);
-
-                    for(int i=4; i<command_list.size(); i++) {
-                        //unsigned long int user_value = atoi(command_list[i].c_str());
-                        //int user_value = atoi(command_list[i].c_str());
-                        //int user_int = (int)user_value;
-                        //memcpy(value, &user_int, var_type_size);
-                        //setVariable(pid, var_name, offset+i, value, mmu, page_table, memory);
-
-                        int local_offset = i - 4;
-                        // if offset goes beyond variable limits, break out of for loop
-                        if(offset + local_offset >= (variable->size/var_type_size)) break;
-
-                        switch(var_type) {
-
-                            case DataType::Char: 
-                                setVariable(pid, var_name, offset + local_offset, (void*)&command_list[i].c_str()[0], mmu, page_table, memory);
-                                break;
-
-                            case DataType::Int: 
-                                {
-                                    int value = std::stoi(command_list[i]);
-                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
-                                }
-                                break;
-
-                            case DataType::Long:
-                                {
-                                    long value = std::stol(command_list[i]);
-                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
-                                }
-                                break;
-
-                            case DataType::Short:
-                                {
-                                    short value = (short)std::stoi(command_list[i]);
-                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
-                                }
-                                break;
-                                
-                            case DataType::Float:
-                                {
-                                    float value = std::stof(command_list[i]);
-                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
-                                }
-                                break;
-
-                            case DataType::Double:
-                                {
-                                    double value = std::stod(command_list[i]);
-                                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
-                                }
-                                break;
-                        }
+                    if(command == "set") {
+                        launchSetVariable(pid, var_name, std::stoul(command_list[3]), mmu, page_table, memory, variable, command_list);
+                    } else if(command == "free") {
+                        freeVariable(pid, var_name, mmu, page_table);
+                    } else {
+                        printf("error: variable already exists\n");
                     }
-                    free(value);
                 } else {
-                    printf("error: variable not found");
+                    if(command == "allocate") {
+                        int virtual_addr = allocateVariable(pid, var_name, stringToDataType(command_list[3]), std::stoul(command_list[4]), mmu, page_table);
+                        if(virtual_addr > -1) {
+                            printf("%d\n", virtual_addr);
+                        }
+                    } else {
+                        printf("error: variable not found\n");
+                    }
                 }
             } else {
-                printf("error: process not found"); 
+                printf("error: process not found\n");
             }
-            
-        } else if(command_list[0] == "free") {
-            freeVariable(std::stoul(command_list[1]), command_list[2], mmu, page_table);
-        } else if(command_list[0] == "terminate") {
-            terminateProcess(std::stoul(command_list[1]), mmu, page_table);
-        } else if(command_list[0] == "print") {
+        } else if(command == "terminate") {
+            uint32_t pid = std::stoul(command_list[1]);
+            if(mmu->getProcessByPID(pid) != NULL) {
+                terminateProcess(pid, mmu, page_table);
+            } else {
+                printf("error: process not found\n");
+            }
+        } else if(command == "print") {
             printCommand(command_list[1], mmu, page_table, memory);
         } else {
-            std::cout << "error: command not recognized" << std:: endl;
+            printf("error: command not recognized\n");
         }
 
         // Get next command
         std::cout << "> ";
-        std::getline (std::cin, command);
+        std::getline (std::cin, user_input);
     }
 
     // Clean up
@@ -182,7 +136,7 @@ void createProcess(int text_size, int data_size, Mmu *mmu, PageTable *page_table
     printf("%d\n", pid);
 }
 
-void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table)
+int allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_t num_elements, Mmu *mmu, PageTable *page_table)
 {
     // Initialize Data
     int size = getDataTypeSize(type);
@@ -206,7 +160,7 @@ void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_
         if(virtual_addr == -1)
         {
             printf("error: allocation exceeds system memory.\n");
-            return;
+            return -1;
         }
     }
     
@@ -226,8 +180,8 @@ void allocateVariable(uint32_t pid, std::string var_name, DataType type, uint32_
     mmu->updateFreeSpace(pid, virtual_addr, size * num_elements);
 
     // Print Virtual Memory Address
-    // TODO: Update this to match output standard
-    printf("Variable %10s added to Process %5d with size %8d at virtual addr %8d.\n", var_name.c_str(), pid, size * num_elements, virtual_addr);
+    //printf("Variable %10s added to Process %5d with size %8d at virtual addr %8d.\n", var_name.c_str(), pid, size * num_elements, virtual_addr);
+    return virtual_addr;
 }
 
 void setVariable(uint32_t pid, std::string var_name, uint32_t offset, void *value, Mmu *mmu, PageTable *page_table, void *memory)
@@ -313,20 +267,97 @@ void printCommand(std::string object, Mmu *mmu, PageTable *page_table, void *mem
         uint32_t pid = std::stoul(object.substr(0, delim_pos));
         std::string var_name = object.substr(delim_pos+1);
 
-        // TODO: TEST AND FINISH THIS
-        Variable* variable = mmu->getVariableByProcessAndName(mmu->getProcessByPID(pid), var_name);
-        uint32_t var_type_size = getDataTypeSize(variable->type);
-        uint32_t num_of_elements = variable->size/var_type_size;    // This should always divide evenly
-        uint32_t physical_address = page_table->getPhysicalAddress( pid, variable->virtual_address + var_type_size);
-        void* value = malloc(var_type_size*8);
-        for(int i=0; i<num_of_elements && i<4; i++) {
-            physical_address += i*var_type_size;
-            memcpy(value, ((char*)memory + physical_address), var_type_size);
-            std::cout << value << std::endl; //<-------------------------------------------IDK how it would know how to print this so this probably won't work
+        Variable* var = mmu->getVariableByProcessAndName(mmu->getProcessByPID(pid), var_name);
+        int physical_address = page_table->getPhysicalAddress(pid, var->virtual_address);
+        int data_size = getDataTypeSize(var->type);
+        int num_elements = (int)(var->size / data_size);
+        for(int i = 0; i < num_elements; i++) {
+            // if not the first element, print a comma
+            if(i > 0) {
+                printf(", ");
+            }
+        
+            if(i >= 4) // if ceiling hit, print etc and break out of the loop
+            {
+                printf("... [%d items]", num_elements);
+                break;
+            }
+            else // else, print the value as normal
+            {
+                void* value = malloc(data_size);
+                memcpy(value, (char*)memory + physical_address + (i * data_size), data_size);
+                switch(var->type) {
+                    case DataType::Char:
+                        printf("%c", *(char*)value);
+                        break;
+                    case DataType::Short:
+                        printf("%d", *(short*)value);
+                        break;
+                    case DataType::Int:
+                        printf("%d", *(int*)value);
+                        break;
+                    case DataType::Float:
+                        printf("%f", *(float*)value);
+                        break;
+                    case DataType::Double:
+                        printf("%lf", *(double*)value);
+                        break;
+                }
+                free(value);
+            }
         }
-        free(value);
+        printf("\n");
     }
+}
 
+/** Launches setVariable() with the correct DataType.
+ */
+void launchSetVariable(uint32_t pid, std::string var_name, uint32_t offset, Mmu *mmu, PageTable *page_table, void *memory, Variable* variable, std::vector<std::string> command_list) {
+    uint32_t var_type_size = getDataTypeSize(variable->type);   // Get the size of the type of variable
+    DataType var_type = variable->type;                         // Get the type of the variable
+    void* value = malloc(var_type_size);                        // Allocate memory depending on the size of the variable being set
+    for(int i=4; i<command_list.size(); i++) {
+        int local_offset = i - 4;
+        // if offset goes beyond variable limits, break out of for loop
+        if(offset + local_offset >= (variable->size/var_type_size)) break;
+
+        // Convert the user input to the correct data type based on the data type of the variable being set
+        switch(var_type) {
+            case DataType::Char: 
+                setVariable(pid, var_name, offset + local_offset, (void*)&command_list[i].c_str()[0], mmu, page_table, memory);
+                break;
+            case DataType::Int: {
+                    int value = std::stoi(command_list[i]);
+                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                }
+                break;
+            case DataType::Long:
+                {
+                    long value = std::stol(command_list[i]);
+                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                }
+                break;
+            case DataType::Short:
+                {
+                    short value = (short)std::stoi(command_list[i]);
+                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                }
+                break;
+            case DataType::Float:
+                {
+                    float value = std::stof(command_list[i]);
+                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                }
+                break;
+            case DataType::Double:
+                {
+                    double value = std::stod(command_list[i]);
+                    setVariable(pid, var_name, offset + local_offset, (void*)&value, mmu, page_table, memory);
+                }
+                break;
+        }
+    }
+    free(value);
 }
 
 /** Converts a DataType to an integer equal to its corresponding size.
